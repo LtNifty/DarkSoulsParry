@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using ThunderRoad;
@@ -109,7 +110,8 @@ namespace FromSoftwareParry
         [ModOption(name: "Parry Type", tooltip: "Determines what type parry to perform.", defaultValueIndex = 1, order = 1)]
         public static ParryType parryType;
 
-        [ModOption(name: "Parry SFX Volume", tooltip: "Determines the volume of the parry SFX.", valueSourceName = nameof(zeroToOneHundered), defaultValueIndex = 100, order = 2)]
+        [ModOptionSlider]
+        [ModOption(name: "Parry SFX Volume", tooltip: "Determines the volume of the parry SFX.", valueSourceName = nameof(zeroToOneHundered), defaultValueIndex = 25, order = 2)]
         public static void ParrySFXVolumeChange(float parrySFXvolume)
         {
             parrySFXsource.volume = parrySFXvolume / 100f;
@@ -124,6 +126,7 @@ namespace FromSoftwareParry
         [ModOption(name: "Posture Parry Mode", tooltip: "Determines what type of parry effect to use for a Posture parry. ", defaultValueIndex = 2, category = "Posture (Sekiro)", order = 0)]
         public static PostureParryMode postureParryMode;
 
+        [ModOptionSlider]
         [ModOption(name: "Posture Min. Velocity", tooltip: "Determines the minimum velocity weapons must clash at to register as a Posture parry.", valueSourceName = nameof(zeroToEightWith2Tenths), defaultValueIndex = 30, category = "Posture (Sekiro)", order = 1)]
         public static float postureMinVelocity;
 
@@ -140,12 +143,15 @@ namespace FromSoftwareParry
         // |    SLOWED    |
         // +--------------+ 
 
+        [ModOptionSlider]
         [ModOption(name: "Slowed Parry Min. Velocity", tooltip: "Determines the minimum velocity weapons must clash at to register as a Dark Souls 1 parry.", valueSourceName = nameof(zeroToEightWith2Tenths), defaultValueIndex = 30, category = "Slowed (DeS, DS1, BB, DS3, DeSR, ER)", order = 0)]
         public static float slowedMinVelocity;
 
+        [ModOptionSlider]
         [ModOption(name: "Slowed Duration", tooltip: "Determines the duration a creature is slowed for after a Dark Souls 1 parry.", valueSourceName = nameof(zeroToOneHundered), defaultValueIndex = 4, category = "Slowed (DeS, DS1, BB, DS3, DeSR, ER)", order = 1)]
         public static float slowedParryDuration;
 
+        [ModOptionSlider]
         [ModOption(name: "Slowed Percentage", tooltip: "Determines a creature's speed on parry in percentage. This number should be low to notice a difference.", valueSourceName = nameof(zeroToOneHundered), defaultValueIndex = 10, category = "Slowed (DeS, DS1, BB, DS3, DeSR, ER)", order = 2)]
         public static float slowedParrySlow;
 
@@ -156,9 +162,11 @@ namespace FromSoftwareParry
         // |   STAGGER   |
         // +-------------+ 
 
+        [ModOptionSlider]
         [ModOption(name: "Stagger Parry Min. Velocity", tooltip: "Determines the minimum velocity weapons must clash at to register as a Dark Souls 2 parry.", valueSourceName = nameof(zeroToEightWith2Tenths), defaultValueIndex = 30, category = "Stagger (DS2)", order = 0)]
         public static float staggerMinVelocity;
 
+        [ModOptionSlider]
         [ModOption(name: "Stagger Delay", tooltip: "Determines how long to wait to destabilize the creature after a Dark Souls 2 parry.", valueSourceName = nameof(zeroToHundredWithTenths), defaultValueIndex = 3, category = "Stagger (DS2)", order = 1)]
         public static float staggerDelayDuration;
 
@@ -169,12 +177,14 @@ namespace FromSoftwareParry
         // |    TIERED    |
         // +--------------+
 
+        [ModOptionSlider]
         [ModOption(name: "Tier 1 Min. Velocity", tooltip: "Determines the minimum velocity weapons must clash at to register as a Tier 1 parry.", valueSourceName = nameof(zeroToEightWith2Tenths), defaultValueIndex = 30, category = "Tiered", order = 0)]
         public static float tier1MinParry;
 
         [ModOption(name: "Teir 1 Parry SFX", tooltip: "Determines the parry sound that will play on a Tier 1 parry.", defaultValueIndex = 0, category = "Tiered", order = 1)]
         public static ParrySound tier1ParrySFX;
 
+        [ModOptionSlider]
         [ModOption(name: "Tier 2 Min. Velocity", tooltip: "Determines the minimum velocity weapons must clash at to register as a Tier 2 parry.", valueSourceName = nameof(zeroToEightWith2Tenths), defaultValueIndex = 40, category = "Tiered", order = 2)]
         public static float tier2MinParry;
 
@@ -200,61 +210,60 @@ namespace FromSoftwareParry
             parrySFXsource = GameManager.local.gameObject.AddComponent<AudioSource>();
             GameManager.local.StartCoroutine(LoadSFX());
             EventManager.onCreatureKill += OnCreatureKill;
-            EventManager.onCreatureParry += OnCreatureParry;
+            EventManager.onCreatureAttackParry += OnCreatureAttackParry;
         }
 
-        private void OnCreatureParry(Creature creature, CollisionInstance collisionInstance)
+        private void OnCreatureAttackParry(Creature parriedCreature, Item parriedItem, Creature parryingCreature, Item parryingItem, CollisionInstance collisionInstance)
         {
             if (!useFSParries)
-                return;
-
-            // if valid parry item
-            if (collisionInstance.targetCollider.GetComponentInParent<Item>() != null)
             {
-                Item item = collisionInstance.targetCollider.GetComponentInParent<Item>();
-                // ... and held by the player
-                if (Player.currentCreature.equipment.GetHeldItem(Side.Right) == item
-                    || Player.currentCreature.equipment.GetHeldItem(Side.Left) == item)
+                return;
+            }
+            Debug.LogWarning("parriedCreature:" + parriedCreature);
+            Debug.LogWarning("parriedItem:" + parriedItem);
+            Debug.LogWarning("parryingCreature:" + parryingCreature);
+            Debug.LogWarning("parryingItem:" + parryingItem);
+
+            if (parryingItem != null && parryingCreature == Player.currentCreature)
+            {
+                if (!shieldOnlyParries || (shieldOnlyParries && parryingItem.data.type == ItemData.Type.Shield))
                 {
-                    if (!shieldOnlyParries || (shieldOnlyParries && item.data.type == ItemData.Type.Shield))
+                    float velocity = parryingItem.physicBody.velocity.magnitude;
+                    switch (parryType)
                     {
-                        float velocity = item.physicBody.velocity.magnitude;
-                        switch (parryType)
-                        {
-                            case ParryType.Slowed:
-                                if (velocity >= slowedMinVelocity)
-                                {
-                                    parrySFXsource.clip = parrySFXclips[(int)slowedParrySound];
-                                    GameManager.local.StartCoroutine(SlowedParry(creature));
-                                }
-                                break;
-                            case ParryType.Stagger:
-                                if (velocity >= staggerMinVelocity)
-                                {
-                                    parrySFXsource.clip = parrySFXclips[(int)staggerParrySound];
-                                    GameManager.local.StartCoroutine(StaggerParry(creature));
-                                }
-                                break;
-                            case ParryType.Posture:
-                                if (velocity >= postureMinVelocity)
-                                {
-                                    parrySFXsource.clip = parrySFXclips[(int)postureParrySound];
-                                    PostureParry(creature, collisionInstance);
-                                }
-                                break;
-                            case ParryType.Tiered:
-                                if (velocity >= tier2MinParry)
-                                {
-                                    parrySFXsource.clip = parrySFXclips[(int)tier2ParrySFX];
-                                    GameManager.local.StartCoroutine(StaggerParry(creature));
-                                }
-                                else if (velocity >= tier1MinParry)
-                                {
-                                    parrySFXsource.clip = parrySFXclips[(int)tier1ParrySFX];
-                                    GameManager.local.StartCoroutine(SlowedParry(creature));
-                                }
-                                break;
-                        }
+                        case ParryType.Slowed:
+                            if (velocity >= slowedMinVelocity)
+                            {
+                                parrySFXsource.clip = parrySFXclips[(int)slowedParrySound];
+                                GameManager.local.StartCoroutine(SlowedParry(parriedCreature));
+                            }
+                            break;
+                        case ParryType.Stagger:
+                            if (velocity >= staggerMinVelocity)
+                            {
+                                parrySFXsource.clip = parrySFXclips[(int)staggerParrySound];
+                                GameManager.local.StartCoroutine(StaggerParry(parriedCreature));
+                            }
+                            break;
+                        case ParryType.Posture:
+                            if (velocity >= postureMinVelocity)
+                            {
+                                parrySFXsource.clip = parrySFXclips[(int)postureParrySound];
+                                PostureParry(parriedCreature, collisionInstance);
+                            }
+                            break;
+                        case ParryType.Tiered:
+                            if (velocity >= tier2MinParry)
+                            {
+                                parrySFXsource.clip = parrySFXclips[(int)tier2ParrySFX];
+                                GameManager.local.StartCoroutine(StaggerParry(parriedCreature));
+                            }
+                            else if (velocity >= tier1MinParry)
+                            {
+                                parrySFXsource.clip = parrySFXclips[(int)tier1ParrySFX];
+                                GameManager.local.StartCoroutine(SlowedParry(parriedCreature));
+                            }
+                            break;
                     }
                 }
             }
@@ -310,7 +319,7 @@ namespace FromSoftwareParry
         private void DisarmCreature(Creature creature)
         {
             BrainModuleMelee module = creature.brain.instance.GetModule<BrainModuleMelee>();
-            module.StopAttack(module, module.animationDataClip, module.attackCount);
+            module.StopAttack(module, module.attack, module.attackCount);
             Creature.DisarmCreature(creature);
             creature.TryPush(
                 Creature.PushType.Magic,
