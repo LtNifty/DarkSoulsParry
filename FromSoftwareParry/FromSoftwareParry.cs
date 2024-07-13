@@ -219,10 +219,6 @@ namespace FromSoftwareParry
             {
                 return;
             }
-            Debug.LogWarning("parriedCreature:" + parriedCreature);
-            Debug.LogWarning("parriedItem:" + parriedItem);
-            Debug.LogWarning("parryingCreature:" + parryingCreature);
-            Debug.LogWarning("parryingItem:" + parryingItem);
 
             if (parryingItem != null && parryingCreature == Player.currentCreature)
             {
